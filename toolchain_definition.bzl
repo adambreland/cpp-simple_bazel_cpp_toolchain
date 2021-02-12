@@ -11,16 +11,6 @@ load(
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 
 def _cc_toolchain_config_info_generator_impl(ctx):
-    supports_dynamic_linker_feature = feature(
-        name      = "supports_dynamic_linker",
-        enabled   = True,
-        flag_sets = [],
-        env_sets  = [],
-        requires  = [],
-        implies   = [],
-        provides  = []
-    )
-
     manually_linked_shared_library_feature = feature(
         name = "manually_linked_shared_library",
         enabled   = False,
@@ -65,8 +55,7 @@ def _cc_toolchain_config_info_generator_impl(ctx):
     )
     
     features = [
-        supports_dynamic_linker_feature,
-        manually_linked_shared_library_feature
+        manually_linked_shared_library_feature,
     ]
 
     action_configs = [
@@ -135,6 +124,19 @@ def _cc_toolchain_config_info_generator_impl(ctx):
         ),
         action_config(
             action_name = ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+            enabled     = False,
+            tools       = [
+                tool(
+                    path                   = "/usr/bin/g++",
+                    tool                   = None,
+                    with_features          = [],
+                    execution_requirements = []
+                )
+            ],
+            implies     = []
+        ),
+        action_config(
+            action_name = ACTION_NAMES.cpp_link_dynamic_library,
             enabled     = False,
             tools       = [
                 tool(

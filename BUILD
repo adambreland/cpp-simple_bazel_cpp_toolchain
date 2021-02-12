@@ -64,7 +64,10 @@ platform(
 # Output targets
 
 # Base dependencies for the dependency relationship permutations below.
-# A shared library.
+# Shared library base dependency targets.
+directory_path = "/home/adam/cpp/bazel_practice/trial_cpp_platform_config/bazel-bin"
+directory_flag = "-L" + directory_path
+
 cc_library(
     name = "so_header",
     deps = [],
@@ -73,10 +76,11 @@ cc_library(
 )
 
 cc_binary(
-    name       = "libso.so",
-    deps       = ["//:so_header"],
-    srcs       = ["//:so.cc"],
-    features = ["manually_linked_shared_library"]
+    name     = "libso.so",
+    deps     = ["//:so_header"],
+    srcs     = ["//:so.cc"],
+    features = ["manually_linked_shared_library"],
+    # linkopts = ["-Wl,-soname=libso.so"]
 )
 
 # # A pic archive.
@@ -118,7 +122,19 @@ cc_binary(
     deps       = ["//:libso.so"],
     srcs       = ["//:bin_on_so.cc"],
     linkopts   = [
-        "-L/home/adam/cpp/bazel_practice/trial_cpp_platform_config/bazel-bin",
+        directory_flag,
+        "-lso"
+    ],
+    linkstatic = False
+)
+
+cc_test(
+    name       = "test_on_so",
+    deps       = ["//:libso.so"],
+    srcs       = ["//:test_on_so.cc"],
+    env        = {"LD_LIBRARY_PATH": directory_path},
+    linkopts   = [
+        directory_flag,
         "-lso"
     ],
     linkstatic = False
