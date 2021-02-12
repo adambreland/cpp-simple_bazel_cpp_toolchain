@@ -10,23 +10,29 @@ load(
 # https://github.com/bazelbuild/bazel/blob/master/tools/build_defs/cc/action_names.bzl
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 
-features = [
-    feature(
-        name      = "static_library_generation",
+def _cc_toolchain_config_info_generator_impl(ctx):
+    supports_dynamic_linker_feature = feature(
+        name      = "supports_dynamic_linker",
         enabled   = True,
+        flag_sets = [],
+        env_sets  = [],
+        requires  = [],
+        implies   = [],
+        provides  = []
+    )
+
+    manually_linked_shared_library_feature = feature(
+        name = "manually_linked_shared_library",
+        enabled   = False,
         flag_sets = [
             flag_set(
-                actions       = [ACTION_NAMES.cpp_link_static_library],
-                with_features = [],                    
+                actions       = [ACTION_NAMES.cpp_compile],
+                with_features = [],
                 flag_groups   = [
                     flag_group(
-                        flags = [
-                            "-r",
-                            "%{output_execpath}",
-                            "%{libraries_to_link.name}"
-                        ],
+                        flags = ["-fpic"],
                         flag_groups = [],
-                        iterate_over = "libraries_to_link",
+                        iterate_over = None,
                         expand_if_available = None,
                         expand_if_not_available = None,
                         expand_if_true = None,
@@ -34,23 +40,13 @@ features = [
                         expand_if_equal = None
                     )
                 ]
-            )
-        ],
-        env_sets  = [],
-        requires  = [],
-        implies   = [],
-        provides  = []
-    ),
-    feature(
-        name      = "shared_library_generation",
-        enabled   = True,
-        flag_sets = [
+            ),
             flag_set(
-                actions       = [ACTION_NAMES.cpp_link_dynamic_library],
+                actions       = [ACTION_NAMES.cpp_link_executable],
                 with_features = [],
                 flag_groups   = [
                     flag_group(
-                        flags       = ["-shared"],
+                        flags = ["-shared"],
                         flag_groups = [],
                         iterate_over = None,
                         expand_if_available = None,
@@ -67,9 +63,12 @@ features = [
         implies   = [],
         provides  = []
     )
-]
+    
+    features = [
+        supports_dynamic_linker_feature,
+        manually_linked_shared_library_feature
+    ]
 
-def _cc_toolchain_config_info_generator_impl(ctx):
     action_configs = [
         action_config(
             action_name = ACTION_NAMES.cpp_compile,
@@ -110,13 +109,34 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                     execution_requirements = []
                 )
             ],
-            flag_sets   = [],
+            flag_sets   = [
+                flag_set(
+                    actions       = [],
+                    with_features = [],                    
+                    flag_groups   = [
+                        flag_group(
+                            flags = [
+                                "-r",
+                                "%{output_execpath}",
+                                "%{libraries_to_link.name}"
+                            ],
+                            flag_groups = [],
+                            iterate_over = "libraries_to_link",
+                            expand_if_available = None,
+                            expand_if_not_available = None,
+                            expand_if_true = None,
+                            expand_if_false = None,
+                            expand_if_equal = None
+                        )
+                    ]
+                )
+            ],
             implies     = []
         ),
         action_config(
-            action_name = ACTION_NAMES.cpp_link_dynamic_library,
-            enabled   = False,
-            tools     = [
+            action_name = ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+            enabled     = False,
+            tools       = [
                 tool(
                     path                   = "/usr/bin/g++",
                     tool                   = None,
@@ -124,9 +144,8 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                     execution_requirements = []
                 )
             ],
-            flag_sets   = [],
             implies     = []
-        ),
+        )        
     ]
 
     return cc_common.create_cc_toolchain_config_info(
