@@ -64,52 +64,57 @@ platform(
 # Output targets
 
 # Base dependencies for the dependency relationship permutations below.
-# Shared library base dependency targets.
 directory_path = "/home/adam/cpp/bazel_practice/trial_cpp_platform_config/bazel-bin"
 directory_flag = "-L" + directory_path
 
 cc_library(
-    name = "so_header",
+    name = "shared_library_header",
     deps = [],
     srcs = [],
-    hdrs = ["//:so.h"],
+    hdrs = ["//:shared_library.h"]
 )
 
+# A shared library
 cc_binary(
-    name     = "libso.so",
-    deps     = ["//:so_header"],
-    srcs     = ["//:so.cc"],
-    features = ["manually_linked_shared_library"],
-    # linkopts = ["-Wl,-soname=libso.so"]
+    name       = "libshared_library.so",
+    deps       = ["//:shared_library_header"],
+    srcs       = ["//:shared_library.cc"],
+    features   = ["interpret_as_shared_library"],
+    linkopts   = ["-Wl,-soname=libshared_library.so"],
+    linkstatic = False
 )
 
-# # A pic archive.
-# cc_library(
-#     name = "pic"
-#     deps = [],
-#     srcs = [
-#         "//:pic1.cc",
-#         "//:pic2.cc"
-#     ],
-#     hdrs = [
-#         "//:pic1.h",
-#         "//:pic2.h"
-#     ]
-# )
+# A pic archive.
+cc_library(
+    name       = "pic",
+    deps       = [],
+    srcs       = [
+        "//:pic1.cc",
+        "//:pic2.cc"
+    ],
+    hdrs       = [
+        "//:pic1.h",
+        "//:pic2.h"
+    ],
+    features   = ["interpret_as_pic_archive"],
+    linkstatic = True
+)
 
-# # An archive
-# cc_library(
-#     name = "ar",
-#     deps = [],
-#     srcs = [
-#         "//:ar1.cc",
-#         "//:ar2.cc"
-#     ],
-#     hdrs = [
-#         "//:ar1.h",
-#         "//:ar2.h""
-#     ] 
-# )
+# An archive
+cc_library(
+    name       = "ar",
+    deps       = [],
+    srcs       = [
+        "//:ar1.cc",
+        "//:ar2.cc"
+    ],
+    hdrs       = [
+        "//:ar1.h",
+        "//:ar2.h"
+    ],
+    features   = ["interpret_as_archive"],
+    linkstatic = True
+)
 
 # The eight meaningful dependency relationships for 
 # S = {binary, shared library, pic archive, archive} 
@@ -118,36 +123,73 @@ cc_binary(
 #
 # A binary which depends on a shared library (1).
 cc_binary(
-    name       = "bin_on_so",
-    deps       = ["//:libso.so"],
-    srcs       = ["//:bin_on_so.cc"],
-    linkopts   = [
-        directory_flag,
-        "-lso"
+    name       = "exe_on_so",
+    deps       = [
+        "//:ar",
+        "//:shared_library_header"
     ],
-    linkstatic = False
+    srcs       = [
+        "//:exe_on_so.cc",
+        "//:libshared_library.so"    
+    ],
+    features   = ["interpret_as_executable"],
+    linkopts   = [],
+    linkstatic = False,
 )
 
-cc_test(
-    name       = "test_on_so",
-    deps       = ["//:libso.so"],
-    srcs       = ["//:test_on_so.cc"],
-    env        = {"LD_LIBRARY_PATH": directory_path},
-    linkopts   = [
-        directory_flag,
-        "-lso"
-    ],
-    linkstatic = False
-)
+# cc_test(
+#     name       = "test_on_so",
+#     deps       = ["//:shared_library"],
+#     srcs       = ["//:test_on_so.cc"],
+#     env        = {"LD_LIBRARY_PATH": directory_path},
+#     linkopts   = [
+#         directory_flag,
+#         "-lso"
+#     ],
+#     linkstatic = False
+# )
 
 # # A binary which depends on an archive (2).
 # cc_binary(
 #     name = "bin_on_ar"
 # )
 
-# # A shared library which depends on a shared library (3).
+# A shared library which depends on a shared library (3).
 # cc_library(
-#     name       = "so_on_so",
+#     name = "so_on_so_header",
+#     deps = [],
+#     srcs = [],
+#     hdrs = ["//:so_on_so.h"]
+# )
+
+# cc_binary(
+#     name     = "libso_on_so.so",
+#     deps     = [
+#         "//:so_on_so_header",
+#         "//:libso.so"
+#     ],
+#     srcs     = ["//:so_on_so.cc"],
+#     features   = ["interpret_as_shared_library"],
+#     linkopts = [
+#         # "-Wl,-soname=libso_on_so.so"
+#         directory_flag,
+#         # Link against libso.so.
+#         "-lso"
+#     ],
+#     linkstatic = False
+# )
+
+# cc_test(
+#     name       = "test_on_so_on_so",
+#     deps       = ["//:libso_on_so.so"],
+#     srcs       = ["//:test_on_so_on_so.cc"],
+#     env        = {"LD_LIBRARY_PATH": directory_path},
+#     linkopts   = [
+#         directory_flag,
+#         "-lso_on_so",
+#         "-Wl,--unresolved-symbols=ignore-in-shared-libs"
+#     ],
+#     linkstatic = False
 # )
 
 # # A shared library which depends on a pic archive (4).
