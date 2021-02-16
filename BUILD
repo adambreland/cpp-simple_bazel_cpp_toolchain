@@ -112,17 +112,12 @@ cc_library(
     linkstatic = True
 )
 
-# The eight meaningful dependency relationships for 
-# S = {binary, shared library, pic archive, archive} 
-# and the binary dependency relationship "A depends on B" where A and B are
-# members of S.
-#
 # An executable which depends on a shared library.
 cc_binary(
-    name       = "exe_on_so",
+    name       = "exe_on_shared_library",
     deps       = ["//:shared_library_header"],
     srcs       = [
-        "//:exe_on_so.cc",
+        "//:exe_on_shared_library.cc",
         "//:libshared_library.so"    
     ],
     features   = ["interpret_as_executable"],
@@ -141,10 +136,17 @@ cc_test(
     linkstatic = False
 )
 
-# # A binary which depends on an archive.
-# cc_binary(
-#     name = "bin_on_ar"
-# )
+# An executable which depends on an archive.
+cc_binary(
+    name       = "exe_on_ar",
+    deps       = ["//:ar"],
+    srcs       = ["//:exe_on_ar.cc"],
+    features   = ["interpret_as_executable"],
+    linkstatic = False
+)
+
+# A test executable which depends on an archive.
+##
 
 # A shared library which depends on a shared library.
 cc_library(
@@ -185,27 +187,53 @@ cc_test(
     linkstatic = False
 )
 
-# # A shared library which depends on a pic archive (4).
+# # A shared library which depends on a pic archive.
 # cc_library(
 #     name = "so_on_pic"
 # )
 
-# # A pic archive which depends on a shared library (5).
+# # A pic archive which depends on a shared library.
 # cc_library(
 #     name = "pic_on_so"
 # )
 
-# # A pic archive which depends on a pic archive (6).
+# A test on the pic archive which depend on a shared library.
+##
+
+# # A pic archive which depends on a pic archive.
 # cc_library(
 #     name = "pic_on_pic"
-# )
+#
 
-# # An archive which depends on a shared library (7).
-# cc_library(
-#     name = "ar_on_so"    
-# )
+# A shared library which depends on the pic archive which depends on a pic
+# archive.
+##
 
-# # An archive which depends on an archive (8).
+# An archive which depends on a shared library.
+cc_library(
+    name       = "ar_on_shared_library",
+    deps       = ["//:shared_library_header"],
+    srcs       = [
+        "//:ar_on_shared_library.cc",
+        "//:libshared_library.so"],
+    hdrs       = ["//:ar_on_shared_library.h"],
+    features   = ["interpret_as_archive"],
+    linkstatic = True
+)
+
+# A test which depends on the archive which depends on a shared library.
+cc_test(
+    name       = "test_on_ar_on_shared_library",
+    deps       = ["//:ar_on_shared_library"],
+    srcs       = ["//:test_on_ar_on_shared_library.cc"],
+    features   = ["interpret_as_test_executable"],
+    linkstatic = False
+)
+
+# # An archive which depends on an archive.
 # cc_library(
 #     name = "ar_on_ar"
 # )
+
+# A test which depends on the archive which depends on an archive.
+##

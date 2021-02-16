@@ -178,18 +178,6 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                 ],
                 with_features = [],
                 flag_groups   = [
-                    flag_group(
-                        flags = [
-                            "%{user_link_flags}"
-                        ],
-                        flag_groups = [],
-                        iterate_over = "user_link_flags",
-                        expand_if_available = "user_link_flags",
-                        expand_if_not_available = None,
-                        expand_if_true = None,
-                        expand_if_false = None,
-                        expand_if_equal = None
-                    ),
                      flag_group(
                         flags = [
                             "-Wl,--unresolved-symbols=ignore-in-shared-libs"
@@ -281,6 +269,54 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                         expand_if_false = None,
                         expand_if_equal = None
                     ),
+                    # This flag_group duplicates any shared libraries which
+                    # come from the previous flag_group. This was found to be
+                    # necessary for archives which depend on shared libraries.
+                    # It appears that Bazel does not order the archive before
+                    # a shared library dependency when the shared library is
+                    # a binary target and it is included in the srcs attribute
+                    # of the archive target. Duplicating shared library options
+                    # which were ordered correctly in the first flag_group does
+                    # not impact the link. 
+                    flag_group(
+                        flags = [],
+                        flag_groups = [
+                            flag_group(
+                                flags = [
+                                    "-l%{libraries_to_link.name}"
+                                ],
+                                iterate_over = None,
+                                expand_if_available = None,
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = variable_with_value(
+                                    name  = "libraries_to_link.type",
+                                    value = "dynamic_library"
+                                )
+                            ),
+                            flag_group(
+                                flags = [
+                                    "-l:%{libraries_to_link.name}"
+                                ],
+                                iterate_over = None,
+                                expand_if_available = None,
+                                expand_if_not_available = None,
+                                expand_if_true = None,
+                                expand_if_false = None,
+                                expand_if_equal = variable_with_value(
+                                    name  = "libraries_to_link.type",
+                                    value = "versioned_dynamic_library"
+                                )
+                            )
+                        ],
+                        iterate_over = "libraries_to_link",
+                        expand_if_available = "libraries_to_link",
+                        expand_if_not_available = None,
+                        expand_if_true = None,
+                        expand_if_false = None,
+                        expand_if_equal = None
+                    ),
                     flag_group(
                         flags = [
                             "-o",
@@ -294,6 +330,18 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                         expand_if_false = None,
                         expand_if_equal = None
                     ),
+                    flag_group(
+                        flags = [
+                            "%{user_link_flags}"
+                        ],
+                        flag_groups = [],
+                        iterate_over = "user_link_flags",
+                        expand_if_available = "user_link_flags",
+                        expand_if_not_available = None,
+                        expand_if_true = None,
+                        expand_if_false = None,
+                        expand_if_equal = None
+                    )
                 ]
             ),
         ],
@@ -424,18 +472,6 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                         ),
                         flag_group(
                             flags = [
-                                "%{user_compile_flags}",
-                            ],
-                            flag_groups = [],
-                            iterate_over = "user_compile_flags",
-                            expand_if_available = "user_compile_flags",
-                            expand_if_not_available = None,
-                            expand_if_true = None,
-                            expand_if_false = None,
-                            expand_if_equal = None
-                        ),
-                        flag_group(
-                            flags = [
                                 "-c", # Stop after assembling object files.
                                 "%{source_file}", # Compilation occurs for a
                                                   # single input file at a time.
@@ -450,6 +486,18 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                             expand_if_false = None,
                             expand_if_equal = None
                         ),
+                        flag_group(
+                            flags = [
+                                "%{user_compile_flags}",
+                            ],
+                            flag_groups = [],
+                            iterate_over = "user_compile_flags",
+                            expand_if_available = "user_compile_flags",
+                            expand_if_not_available = None,
+                            expand_if_true = None,
+                            expand_if_false = None,
+                            expand_if_equal = None
+                        )
                     ]
                 )
             ],
