@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "so.h"
+#include "shared_library.h"
 
 int main(int argc, char* argv[])
 {

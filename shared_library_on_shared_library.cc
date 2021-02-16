@@ -1,8 +1,8 @@
-#include "so_on_so.h"
+#include "shared_library_on_shared_library.h"
 
 #include <string>
 
-#include "so.h"
+#include "shared_library.h"
 
 std::string so_on_so_func()
 {

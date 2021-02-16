@@ -63,10 +63,7 @@ platform(
 
 # Output targets
 
-# Base dependencies for the dependency relationship permutations below.
-directory_path = "/home/adam/cpp/bazel_practice/trial_cpp_platform_config/bazel-bin"
-directory_flag = "-L" + directory_path
-
+# A shared library as two targets: a header and the shared library binary.
 cc_library(
     name = "shared_library_header",
     deps = [],
@@ -74,7 +71,6 @@ cc_library(
     hdrs = ["//:shared_library.h"]
 )
 
-# A shared library
 cc_binary(
     name       = "libshared_library.so",
     deps       = ["//:shared_library_header"],
@@ -121,76 +117,73 @@ cc_library(
 # and the binary dependency relationship "A depends on B" where A and B are
 # members of S.
 #
-# A binary which depends on a shared library (1).
+# An executable which depends on a shared library.
 cc_binary(
     name       = "exe_on_so",
-    deps       = [
-        "//:ar",
-        "//:shared_library_header"
-    ],
+    deps       = ["//:shared_library_header"],
     srcs       = [
         "//:exe_on_so.cc",
         "//:libshared_library.so"    
     ],
     features   = ["interpret_as_executable"],
-    linkopts   = [],
     linkstatic = False,
 )
 
-# cc_test(
-#     name       = "test_on_so",
-#     deps       = ["//:shared_library"],
-#     srcs       = ["//:test_on_so.cc"],
-#     env        = {"LD_LIBRARY_PATH": directory_path},
-#     linkopts   = [
-#         directory_flag,
-#         "-lso"
-#     ],
-#     linkstatic = False
-# )
+# A test executable which depends on a shared library.
+cc_test(
+    name       = "test_on_shared_library",
+    deps       = ["//:shared_library_header"],
+    srcs       = [
+        "//:test_on_shared_library.cc",
+        "//:libshared_library.so"
+    ],
+    features   = ["interpret_as_test_executable"],
+    linkstatic = False
+)
 
-# # A binary which depends on an archive (2).
+# # A binary which depends on an archive.
 # cc_binary(
 #     name = "bin_on_ar"
 # )
 
-# A shared library which depends on a shared library (3).
-# cc_library(
-#     name = "so_on_so_header",
-#     deps = [],
-#     srcs = [],
-#     hdrs = ["//:so_on_so.h"]
-# )
+# A shared library which depends on a shared library.
+cc_library(
+    name = "shared_library_on_shared_library_header",
+    deps = [],
+    srcs = [],
+    hdrs = ["//:shared_library_on_shared_library.h"]
+)
 
-# cc_binary(
-#     name     = "libso_on_so.so",
-#     deps     = [
-#         "//:so_on_so_header",
-#         "//:libso.so"
-#     ],
-#     srcs     = ["//:so_on_so.cc"],
-#     features   = ["interpret_as_shared_library"],
-#     linkopts = [
-#         # "-Wl,-soname=libso_on_so.so"
-#         directory_flag,
-#         # Link against libso.so.
-#         "-lso"
-#     ],
-#     linkstatic = False
-# )
+cc_binary(
+    name       = "libshared_library_on_shared_library.so",
+    deps       = [
+        "//:shared_library_on_shared_library_header",
+        "//:shared_library_header"
+    ],
+    srcs       = [
+        "//:shared_library_on_shared_library.cc",
+        "//:libshared_library.so"
+    ],
+    features   = ["interpret_as_shared_library"],
+    linkopts   = ["-Wl,-soname=libshared_library_on_shared_library.so"],
+    linkstatic = False
+)
 
-# cc_test(
-#     name       = "test_on_so_on_so",
-#     deps       = ["//:libso_on_so.so"],
-#     srcs       = ["//:test_on_so_on_so.cc"],
-#     env        = {"LD_LIBRARY_PATH": directory_path},
-#     linkopts   = [
-#         directory_flag,
-#         "-lso_on_so",
-#         "-Wl,--unresolved-symbols=ignore-in-shared-libs"
-#     ],
-#     linkstatic = False
-# )
+# A test on the shared library which depends on a shared library.
+cc_test(
+    name       = "test_on_shared_library_on_shared_library",
+    deps       = [
+        "//:shared_library_on_shared_library_header",
+    ],
+    srcs       = [
+        "//:test_on_shared_library_on_shared_library.cc",
+        "//:libshared_library_on_shared_library.so",
+    ],
+    # $$ is an escaped $. This is necessary due to Make variable substitution.
+    env        = {"LD_LIBRARY_PATH": "$${ORIGIN}"}, 
+    features   = ["interpret_as_test_executable"],
+    linkstatic = False
+)
 
 # # A shared library which depends on a pic archive (4).
 # cc_library(
