@@ -277,7 +277,7 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                     # a binary target and it is included in the srcs attribute
                     # of the archive target. Duplicating shared library options
                     # which were ordered correctly in the first flag_group does
-                    # not impact the link. 
+                    # not impact the correctness of the link.
                     flag_group(
                         flags = [],
                         flag_groups = [
@@ -562,10 +562,7 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                     with_features = [],                    
                     flag_groups   = [
                         flag_group(
-                            flags = [
-                                "-rs",
-                                "%{output_execpath}"
-                            ],
+                            flags = ["-rcsD"],
                             flag_groups = [],
                             iterate_over = None,
                             expand_if_available = None,
@@ -575,12 +572,10 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                             expand_if_equal = None
                         ),
                         flag_group(
-                            flags = [
-                               "%{user_link_flags}"
-                            ],
+                            flags = ["%{output_execpath}"],
                             flag_groups = [],
-                            iterate_over = "user_link_flags",
-                            expand_if_available = "user_link_flags",
+                            iterate_over = None,
+                            expand_if_available = "output_execpath",
                             expand_if_not_available = None,
                             expand_if_true = None,
                             expand_if_false = None,
