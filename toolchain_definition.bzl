@@ -596,6 +596,9 @@ def _cc_toolchain_config_info_generator_impl(ctx):
             ],
             implies     = []
         ),
+        # Use of strip, e.g. bazel build <target name>.stripped, failed due to
+        # the file being read-only. This was not resolved. However, an
+        # action_config for ACTION_NAMES.strip is necessary.
         action_config(
             action_name = ACTION_NAMES.strip,
             enabled     = False,
@@ -612,6 +615,18 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                     actions = [],
                     with_features = [],
                     flag_groups = [
+                        # This option was included to match the expected
+                        # behavior of: bazel build <target name>.stripped
+                        flag_group(
+                            flags = ["--strip-debug"],
+                            flag_groups = [],
+                            iterate_over = None,
+                            expand_if_available = None,
+                            expand_if_not_available = None,
+                            expand_if_true = None,
+                            expand_if_false = None,
+                            expand_if_equal = None
+                        ),
                         flag_group(
                             flags = ["%{stripopts}"],
                             flag_groups = [],
@@ -626,7 +641,7 @@ def _cc_toolchain_config_info_generator_impl(ctx):
                             flags = ["%{input_file}"],
                             flag_groups = [],
                             iterate_over = None,
-                            expand_if_available = None,
+                            expand_if_available = "input_file",
                             expand_if_not_available = None,
                             expand_if_true = None,
                             expand_if_false = None,
@@ -645,7 +660,13 @@ def _cc_toolchain_config_info_generator_impl(ctx):
         action_configs                  = action_configs,
         artifact_name_patterns          = [],
         cxx_builtin_include_directories = [
-            "/usr/lib/gcc/x86_64-linux-gnu/9",
+            # Found with: gcc -E -xc++ - -v
+            "/usr/include/c++/9",
+            "/usr/include/x86_64-linux-gnu/c++/9",
+            "/usr/include/c++/9/backward",
+            "/usr/lib/gcc/x86_64-linux-gnu/9/include",
+            "/usr/local/include",
+            "/usr/include/x86_64-linux-gnu",
             "/usr/include"
         ],
         toolchain_identifier            = "",

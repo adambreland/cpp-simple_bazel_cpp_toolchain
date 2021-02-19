@@ -48,7 +48,8 @@ toolchain(
     # toolchain. Rules can use more than one toolchain_type. C++ rules use a
     # single toolchain_type. The name of a toolchain_type is, by convention,
     # always "toolchain_type".
-    toolchain_type         = "@bazel_tools//tools/cpp:toolchain_type"
+    toolchain_type         = "@bazel_tools//tools/cpp:toolchain_type",
+    visibility             = ["//visibility:public"]
 )
 
 # Platform target definition
@@ -101,7 +102,7 @@ cc_library(
     linkstatic = True
 )
 
-# An archive
+# An archive.
 # 3
 cc_library(
     name       = "ar",
