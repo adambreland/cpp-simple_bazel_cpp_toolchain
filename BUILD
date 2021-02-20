@@ -25,7 +25,7 @@ cc_toolchain(
     strip_files             = "//:empty",
     supports_header_parsing = False,
     supports_param_files    = False,
-    toolchain_config    = "//:simple_x86_64_linux_config",
+    toolchain_config        = "//:simple_x86_64_linux_config",
     # toolchain_identifier (optional)
 )
 
@@ -81,8 +81,7 @@ cc_binary(
     deps       = ["//:shared_library_header"],
     srcs       = ["//:shared_library.cc"],
     features   = ["interpret_as_shared_library"],
-    linkopts   = ["-Wl,-soname=libshared_library.so"],
-    linkstatic = False
+    linkopts   = ["-Wl,-soname=libshared_library.so"]
 )
 
 # A pic archive.
@@ -128,8 +127,7 @@ cc_binary(
         "//:exe_on_shared_library.cc",
         "//:libshared_library.so"    
     ],
-    features   = ["interpret_as_executable"],
-    linkstatic = False,
+    features   = ["interpret_as_executable"]
 )
 
 # A test executable which depends on a shared library.
@@ -141,8 +139,7 @@ cc_test(
         "//:test_on_shared_library.cc",
         "//:libshared_library.so"
     ],
-    features   = ["interpret_as_test_executable"],
-    linkstatic = False
+    features   = ["interpret_as_test_executable"]
 )
 
 # An executable which depends on an archive.
@@ -151,8 +148,7 @@ cc_binary(
     name       = "exe_on_ar",
     deps       = ["//:ar"],
     srcs       = ["//:exe_on_ar.cc"],
-    features   = ["interpret_as_executable"],
-    linkstatic = False
+    features   = ["interpret_as_executable"]
 )
 
 # A test executable which depends on an archive.
@@ -161,8 +157,7 @@ cc_test(
     name       = "test_on_ar",
     deps       = ["//:ar"],
     srcs       = ["//:test_on_ar.cc"],
-    features   = ["interpret_as_test_executable"],
-    linkstatic = False
+    features   = ["interpret_as_test_executable"]
 )
 
 # A shared library which depends on a shared library.
@@ -187,8 +182,7 @@ cc_binary(
         "//:libshared_library.so"
     ],
     features   = ["interpret_as_shared_library"],
-    linkopts   = ["-Wl,-soname=libshared_library_on_shared_library.so.1"],
-    linkstatic = False
+    linkopts   = ["-Wl,-soname=libshared_library_on_shared_library.so.1"]
 )
 
 # Creates the soname symlink for libshared_library_on_shared_library.so.1.0.0.
@@ -215,8 +209,7 @@ cc_test(
     data       = ["//:libshared_library_on_shared_library.so.1.0.0_soname_symlink"],
     # $$ is an escaped $. This is necessary due to Make variable substitution.
     env        = {"LD_LIBRARY_PATH": "$${ORIGIN}"}, 
-    features   = ["interpret_as_test_executable"],
-    linkstatic = False
+    features   = ["interpret_as_test_executable"]
 )
 
 # A shared library which depends on a pic archive.
@@ -236,8 +229,7 @@ cc_binary(
     ],
     srcs       = ["//:shared_library_on_pic.cc"],
     features   = ["interpret_as_shared_library"],
-    linkopts   = ["-Wl,-soname=libshared_library_on_pic.so"],
-    linkstatic = False
+    linkopts   = ["-Wl,-soname=libshared_library_on_pic.so"]
 )
 
 # A pic archive which depends on a shared library.
@@ -271,8 +263,7 @@ cc_binary(
     ],
     srcs       = ["//:shared_library_on_pic_on_shared_library.cc"],
     features   = ["interpret_as_shared_library"],
-    linkopts   = ["-Wl,-soname=libshared_library_on_pic_on_shared_library.so"],
-    linkstatic = False
+    linkopts   = ["-Wl,-soname=libshared_library_on_pic_on_shared_library.so"]
 )
 
 # A pic archive which depends on a pic archive.
@@ -305,8 +296,7 @@ cc_binary(
     ],
     srcs       = ["//:shared_library_on_pic_on_pic.cc"],
     features   = ["interpret_as_shared_library"],
-    linkopts   = ["-Wl,-soname=libshared_library_on_pic_on_pic.so"],
-    linkstatic = False
+    linkopts   = ["-Wl,-soname=libshared_library_on_pic_on_pic.so"]
 )
 
 # An archive which depends on a shared library.
@@ -328,8 +318,7 @@ cc_test(
     name       = "test_on_ar_on_shared_library",
     deps       = ["//:ar_on_shared_library"],
     srcs       = ["//:test_on_ar_on_shared_library.cc"],
-    features   = ["interpret_as_test_executable"],
-    linkstatic = False
+    features   = ["interpret_as_test_executable"]
 )
 
 # An archive which depends on an archive.

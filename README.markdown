@@ -1,0 +1,328 @@
+# A Bazel C++ toolchain for building shared libraries and dependent binaries which conform to typical Linux linking practices.
+
+## Introduction
+This Bazel workspace defines `//:simple_x86_64_linux_toolchain`. This
+toolchain can be used with the standard C++ rules. As the default C++ toolchain
+produces libraries and executables which do not conform to typical linking
+practices, `//:simple_x86_64_linux_toolchain` was developed to have the
+following features:
+* Position-independent code (PIC) is only used for shared libraries and
+  PIC archives by default.
+* Executables and shared libraries are linked against their direct shared
+  library dependencies.
+  * The `DT_NEEDED` fields of these outputs hold shared library Bazel target
+    names by default. These names are not mangled in some fashion.
+  * The toolchain allows a shared library to be defined with a soname using the
+    linker option `-Wl,-soname=<library soname>`.
+  * Executables and shared libraries are not linked against shared libraries
+    which are part of the implementation details of Bazel.
+  * Mechanisms such as `DT_RPATH` are not used in executables and
+    shared libraries by default.
+* A library must be exactly one of: shared library, PIC archive, or archive.
+
+## Use cases and limitations
+This toolchain is intended to be a starting point in the definition of
+C++ toolchains which conform to typical Linux linking practices. It is not
+intended to be a drop-in replacement for the default C++ toolchain. As it is,
+it does not support all C++ rule attribute semantics. The toolchain is
+currently used by [as_components](https://github.com/adambreland/cpp-as_components)
+for relatively simple build actions.
+
+The `-s` flag for `bazel build` can be used to print build command lines. These
+can then be inspected to ensure that a particular target is built correctly by
+the toolchain.
+
+### Notable Bazel features which are not supported
+* The toolchain does not differentiate between the standard Bazel compilation
+  modes: `dbg`, `fastbuild`, and `opt`.
+
+## Using the toolchain
+The toolchain is intended to be used with platforms. Toolchain resolution which
+uses platforms only occurs for C++ rules when the following `build` flag is
+enabled:
+
+`--incompatible_enable_cc_toolchain_resolution`
+
+When platforms are used, the definition of a `cc_toolchain_suite` target is not
+necessary.
+
+Steps:
+1. In a `BUILD` file, the rule `cc_toolchain_config_info_generator` which
+   provides an appropriate provider instance for the `toolchain_config`
+   attribute of `cc_toolchain` is loaded from `//:toolchain_definition.bzl`.
+2. The rule is instantiated to define a toolchain configuration target. The
+   name of this target conventionally ends with `_config`.
+3. A `cc_toolchain` target is instantiated with the appropriate attribute
+   values. The value of the `toolchain_config` attribute is set to the
+   config target which was instantiated in the previous step.
+4. A `toolchain` target is instantiated with:
+   * The appropriate `exec_compatible_with` and `target_compatible_with`
+     constraint values.
+   * As the value of the `toolchain` attribute, the `cc_toolchain` target which
+     was instantiated in the previous step.
+   * The `toolchain_type` attribute value
+     `"@bazel_tools//tools/cpp:toolchain_type"`.
+
+   The name of the `toolchain` target conventionally end with `_toolchain`.
+5. The `toolchain` target which was instantiated in the previous step is
+   registered in the `WORKSPACE` file with `register_toolchains`.
+6. Build and test actions use the
+   `--incompatible_enable_cc_toolchain_resolution` flag. This can be done
+   on the command line or through use of a `.bazelrc` file.
+
+The `BUILD` and `WORKSPACE` files of this repository serve as examples for this
+process.
+
+## Conceptual target types and target definition
+The toolchain allows the definition of five kinds of conceptual targets.
+
+1. Shared library
+2. Executable
+3. Test executable
+4. PIC archive
+5. Archive
+
+Explanations of the target structure, Bazel attribute values, and features
+which are necessary to define targets of these types follow. Also given are
+explanations of:
+* how to depend on shared libraries which are produced by the toolchain
+* how to depend on internal and external targets in `cc_test` targets
+
+### Shared library targets
+A shared library target is meant to represent a shared library which is linked
+to its direct dependencies and which relies on the proper installation of these
+dependencies.
+
+Configuration:
+* Rule type: Two targets are defined for each shared library.
+  * A `cc_library` target is defined for the shared library header.
+  * A `cc_binary` target is defined for the shared library.
+* Target names: For shared library `foo`:
+  * Header (`cc_library`): A conventional pattern such as `foo_header` is
+    suggested.
+  * Binary (`cc_binary`): `libfoo.so` or a versioned variant such as
+    `libfoo.so.1.0.0`
+* Dependencies (`deps`): The `cc_library` header target.
+* Soname (optional): For example, a soname linker option such as
+  `-Wl,-soname=libfoo.so.1` may be included in the `linkopts` attribute of the
+  `cc_binary` target.
+* Feature: `"interpret_as_shared_library"` (for the `cc_binary` target)
+
+Example:
+```
+cc_library(
+    name = "foo_header",
+    deps = [],
+    srcs = [],
+    hdrs = ["//:foo.h"]
+)
+
+cc_binary(
+    name     = "libfoo.so.1.0.0",
+    deps     = ["//:foo_header"],
+    srcs     = ["//:foo.cc"],
+    linkopts = ["-Wl,-soname=libfoo.so.1"],
+    features = ["interpret_as_shared_library"]
+)
+```
+
+#### Depending on a shared library
+Any target which depends on a shared library which was defined in the way
+described above must include the shared library header target in `deps` and the
+shared library binary target in `srcs`.
+
+Tests which depend on a versioned shared library which uses a major version
+soname must have a target which defines a major version symbolic link to the
+shared library in their `data` attribute.
+
+Examples:
+```
+cc_binary(
+    name     = "bar_on_foo",
+    deps     = ["//:foo_header"],
+    srcs     = [
+        "//:bar.cc",
+        "//:libfoo.so.1.0.0"
+    ],
+    features = ["interpret_as_executable"]
+)
+
+genrule(
+    name     = "libfoo.so.1.0.0_soname_symlink",
+    srcs     = ["//:libfoo.so.1.0.0"],
+    outs     = ["libfoo.so.1"],
+    # Make variable substitution is used to access the appropriate file paths.
+    cmd_bash = "ln -s $(rootpath //:libfoo.so.1.0.0) $@"
+)
+
+cc_test(
+    name     = "test_on_foo",
+    deps     = ["//:foo_header"],
+    srcs     = [
+        "//:test_on_foo.cc",
+        "//:libfoo.so.1.0.0"
+    ],
+    data     = ["//:libfoo.so.1.0.0_soname_symlink"],
+    features = ["interpret_as_test_executable"]
+)
+```
+
+### Executable targets
+An executable target is meant to represent an executable program that can be
+executed independently of a Bazel installation provided that its shared
+library dependencies are properly installed.
+
+Configuration:
+* Rule type: `cc_binary`
+* Feature: `"interpret_as_executable"`
+
+Example:
+```
+cc_binary(
+    name       = "executable_target",
+    deps       = [],
+    srcs       = ["//:executable_target.cc"],
+    features   = ["interpret_as_executable"]
+)
+```
+
+### Test executable targets
+A test executable target is meant to represent a test which is executed by
+Bazel. It is assumed that the test must be able to execute when its shared
+library dependencies have not been installed.
+
+Configuration:
+* Rule type: `cc_test`
+* Shared library dependencies: indirect shared library dependencies are made
+  available with `LD_LIBRARY_PATH` as explained below.
+* feature: `"interpret_as_test_executable"`
+
+Example without indirect shared library dependencies:
+```
+cc_test(
+    name     = "test_on_so",
+    deps     = ["//:so_header"],
+    srcs     = [
+        "//:test_on_so.cc",
+        "//:libso.so"
+    ],
+    features = ["interpret_as_test_executable"]
+)
+```
+
+#### Tests with indirect shared library dependencies
+Tests can access their direct shared library dependencies without additional
+configuration. Indirect shared library dependencies must be exposed using
+the `LD_LIBRARY_PATH` environment variable of the Linux dynamic linker. The
+`ORIGIN` token is expanded in the value of `LD_LIBRARY_PATH` to the directory
+which contains the test executable. This can be used to describe the
+directories which contain the indirect shared library dependencies of the test.
+
+Notes on using `ORIGIN` for this purpose:
+* A test which is defined in a package beneath the workspace root can refer
+  to targets above its package using the parent directory special symbol `..`.
+* Bazel stores external targets within the directory `external` which is
+  located at the workspace root. The repository name as defined by
+  `local_repository` is used as the root of the repository under `external`.
+  The directory structure within a repository directory is the same as the
+  structure of the external repository.
+* A colon-separated list of directories is accepted for the value of
+  `LD_LIBRARY_PATH`.
+
+Example with indirect shared library dependencies:
+* `libspam.so` is located at the workspace root.
+* `libcram.so` is located at the workspace root and is a dependency of 
+  `libspam.so`.
+* `libham.so` is located in package `package1` under the workspace root and is
+  a dependency of `libspam.so`.
+* `libeggs.so` is located in the external repository `external_eggs` at its
+  workspace root. It is a dependency of `libspam.so`.
+```
+cc_library(
+    name = "spam_header",
+    deps = [],
+    srcs = [],
+    hdrs = ["//:spam.h"]
+)
+
+cc_binary(
+    name     = "libspam.so",
+    deps     = [
+        "//:spam_header",
+        "//:cram_header",
+        "//package1:ham_header",
+        "@external_eggs//:eggs_header"
+    ],
+    srcs     = [
+        "//:spam.cc",
+        "//:libcram.so",
+        "//package1:libham.so",
+        "@external_eggs//:libeggs.so"
+    ],
+    features = ["interpret_as_shared_library"]
+)
+
+cc_test(
+    name     = "test_with_indirect_so_deps",
+    deps     = ["//:spam_header"],
+    srcs     = [
+        "//:test_with_indirect_so_deps.cc",
+        "//:libspam.so"
+    ],
+    # Use $$ to escape $ and prevent Make variable substitution.
+    env      = {
+        "LD_LIBRARY_PATH":
+          "$${ORIGIN}:$${ORIGIN}/package1:$${ORIGIN}/external/external_eggs"
+    },
+    features = ["interpret_as_test_executable"]
+)
+```
+
+### Archive targets
+Archive targets are intended to represent archives whose sources are not
+also directly compiled to shared object files or executables. This assumption
+separates library targets into two classes: those which define shared libraries
+and those which define static libraries.
+
+PIC archives and archives are defined in the usual way with two additions:
+* The `linkstatic` attribute is set to `True` to ensure that a shared library
+  is not generated.
+* The appropriate feature, either `"interpret_as_pic_archive"` or
+  `"interpret_as_archive"`, is used.
+
+Examples:
+```
+cc_library(
+    name       = "pic_archive",
+    deps       = [],
+    srcs       = ["//:pic_archive.cc"],
+    hdrs       = ["//:pic_archive.h"],
+    linkstatic = True,
+    features   = ["interpret_as_pic_archive"]
+)
+
+cc_library(
+    name       = "archive",
+    deps       = [],
+    srcs       = ["//:archive.cc"],
+    hdrs       = ["//:archive.h"],
+    linkstatic = True,
+    features   = ["interpret_as_archive"]
+)
+```
+
+## Building and testing the trial targets
+Trial targets are defined at the workspace root. These targets possess various
+dependency relationships on the three kinds of targets which can be depended
+upon (shared library, PIC archive, and archive). For example, in addition to an
+executable which depends on a shared library and a test which depends on a
+shared library, a test which depends on a shared library which depends on a 
+shared library is defined.
+
+The command lines which are generated by the toolchain for these targets can
+be inspected by using the `-s` flag when executing `bazel build` or 
+`bazel test`. For example, `bazel build -s ...` should succeed and print the
+command lines which were used for each trial target. 
+
+Several test executables are defined to allow the validation of shared 
+library loading. An execution of `bazel test ...` should pass.
