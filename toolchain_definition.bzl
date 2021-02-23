@@ -89,7 +89,7 @@ interpret_as_shared_library_feature = feature(
             with_features = [],
             flag_groups   = [
                 flag_group(
-                    flags = ["-fpic"],
+                    flags = ["-fPIC"],
                     flag_groups = [],
                     iterate_over = None,
                     expand_if_available = None,
@@ -134,7 +134,7 @@ interpret_as_pic_archive_feature = feature(
             with_features = [],
             flag_groups   = [
                 flag_group(
-                    flags = ["-fpic"],
+                    flags = ["-fPIC"],
                     flag_groups = [],
                     iterate_over = None,
                     expand_if_available = None,
@@ -179,7 +179,8 @@ libraries_to_link_feature = feature(
             flag_groups   = [
                     flag_group(
                     flags = [
-                        "-Wl,--unresolved-symbols=ignore-in-shared-libs"
+                        "-Wl,--unresolved-symbols=ignore-in-shared-libs",
+                        "-pass-exit-codes"
                     ],
                     flag_groups = [],
                     iterate_over = None,
@@ -350,6 +351,40 @@ libraries_to_link_feature = feature(
     provides  = []
 )
 
+determinism_options_feature = feature(
+    name      = "determinism_options",
+    enabled   = True,
+    flag_sets = [
+        flag_set(
+            # Note that static linking uses the d option (deterministic archive
+            # creation) by default.
+            actions       = [ACTION_NAMES.cpp_compile],
+            with_features = [],
+            flag_groups   = [
+                flag_group(
+                    flags = [
+                        "-Wno-builtin-macro-redefined",
+                        '-D__DATE__="redacted"',
+                        '-D__TIMESTAMP__="redacted"',
+                        '-D__TIME__="redacted"'
+                    ],
+                    flag_groups = [],
+                    iterate_over = None,
+                    expand_if_available = None,
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None
+                )
+            ]
+        )
+    ],
+    env_sets  = [],
+    requires  = [],
+    implies   = [],
+    provides  = []
+)
+
 compile_config = action_config(
     action_name = ACTION_NAMES.cpp_compile,
     enabled     = False,
@@ -468,6 +503,23 @@ compile_config = action_config(
                     flag_groups = [],
                     iterate_over = None,
                     expand_if_available = "source_file",
+                    expand_if_not_available = None,
+                    expand_if_true = None,
+                    expand_if_false = None,
+                    expand_if_equal = None
+                ),
+                flag_group(
+                    flags = [
+                        "-U_FORTIFY_SOURCE",
+                        "-fstack-protector",
+                        "-Wall",
+                        "-Wunused-but-set-parameter",
+                        "-fno-omit-frame-pointer",
+                        "-fno-canonical-system-headers"
+                    ],
+                    flag_groups = [],
+                    iterate_over = None,
+                    expand_if_available = None,
                     expand_if_not_available = None,
                     expand_if_true = None,
                     expand_if_false = None,
@@ -653,7 +705,8 @@ features = [
     interpret_as_shared_library_feature,
     interpret_as_pic_archive_feature,
     interpret_as_archive_feature,
-    libraries_to_link_feature
+    libraries_to_link_feature,
+    determinism_options_feature
 ]
 
 action_configs = [

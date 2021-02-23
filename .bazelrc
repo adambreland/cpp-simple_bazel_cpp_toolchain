@@ -1,4 +1,2 @@
 build --incompatible_enable_cc_toolchain_resolution
 build --toolchain_resolution_debug
-# Is this option still necessary for C++ builds?
-# build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain

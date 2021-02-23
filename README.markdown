@@ -4,7 +4,8 @@
 This Bazel workspace defines `//:simple_x86_64_linux_toolchain`. This
 toolchain can be used with the standard C++ rules. As the default C++ toolchain
 produces libraries and executables which do not conform to typical linking
-practices, `//:simple_x86_64_linux_toolchain` was developed to have the
+practices (see, for example, this [issue](https://github.com/bazelbuild/bazel/issues/492)
+), `//:simple_x86_64_linux_toolchain` was developed to have the
 following features:
 * Position-independent code (PIC) is only used for shared libraries and
   PIC archives by default.
@@ -19,8 +20,16 @@ following features:
   * Mechanisms such as `DT_RPATH` are not used in executables and
     shared libraries by default.
 * A library must be exactly one of: shared library, PIC archive, or archive.
+* Targets which are defined to use the toolchain can depend on targets which
+  should not be built with the toolchain.
 
 ## Use cases and limitations
+### Instruction set, operating system, and compiler.
+* The toolchain is configured for Linux and x86-64. It uses `g++`.
+* The current include directories assume `g++` version 9. They can be found
+  in `//:toolchain_definition.bzl` in list `gcc_system_include_directories`.
+
+### Limitations
 This toolchain is intended to be a starting point in the definition of
 C++ toolchains which conform to typical Linux linking practices. It is not
 intended to be a drop-in replacement for the default C++ toolchain. As it is,
@@ -33,45 +42,45 @@ can then be inspected to ensure that a particular target is built correctly by
 the toolchain.
 
 ### Notable Bazel features which are not supported
-* The toolchain does not differentiate between the standard Bazel compilation
-  modes: `dbg`, `fastbuild`, and `opt`.
+* The toolchain does not vary compilation and linking options for the standard
+  Bazel compilation modes: `dbg`, `fastbuild`, and `opt`. If such behavior is
+  desired, it can be implemented by specifying the desired compilation mode and
+  using instances of the `--copt` and `--linkopt` command line build options.
 
 ## Using the toolchain
-The toolchain is intended to be used with platforms. Toolchain resolution which
-uses platforms only occurs for C++ rules when the following `build` flag is
-enabled:
+The toolchain is intended to be used with [platforms](https://docs.bazel.build/versions/master/platforms-intro.html).
+Toolchain resolution which uses platforms only occurs for C++ rules when the
+following `build` flag is enabled:
 
 `--incompatible_enable_cc_toolchain_resolution`
 
 When platforms are used, the definition of a `cc_toolchain_suite` target is not
 necessary.
 
-Steps:
-1. In a `BUILD` file, the rule `cc_toolchain_config_info_generator` which
-   provides an appropriate provider instance for the `toolchain_config`
-   attribute of `cc_toolchain` is loaded from `//:toolchain_definition.bzl`.
-2. The rule is instantiated to define a toolchain configuration target. The
-   name of this target conventionally ends with `_config`.
-3. A `cc_toolchain` target is instantiated with the appropriate attribute
-   values. The value of the `toolchain_config` attribute is set to the
-   config target which was instantiated in the previous step.
-4. A `toolchain` target is instantiated with:
-   * The appropriate `exec_compatible_with` and `target_compatible_with`
-     constraint values.
-   * As the value of the `toolchain` attribute, the `cc_toolchain` target which
-     was instantiated in the previous step.
-   * The `toolchain_type` attribute value
-     `"@bazel_tools//tools/cpp:toolchain_type"`.
+### Simple description of use
+Using the toolchain without modification requires a few steps:
 
-   The name of the `toolchain` target conventionally end with `_toolchain`.
-5. The `toolchain` target which was instantiated in the previous step is
-   registered in the `WORKSPACE` file with `register_toolchains`.
-6. Build and test actions use the
-   `--incompatible_enable_cc_toolchain_resolution` flag. This can be done
-   on the command line or through use of a `.bazelrc` file.
+1. This repository is made an external repository of the local repository.
+   For example, `local_repository` may be used if this repository was cloned
+   locally.
+2. The execution platforms and toolchain are registered in the local
+   `WORKSPACE` file as follows (assuming that the external repository is
+   accessed with `@simple_bazel_cpp_toolchain`):
+   ```
+   register_execution_platforms(
+       "@local_config_platform//:host",
+       "@simple_bazel_cpp_toolchain//:simple_cpp_x86_64_linux_platform"
+   )
 
-The `BUILD` and `WORKSPACE` files of this repository serve as examples for this
-process.
+   register_toolchains(
+       "@simple_bazel_cpp_toolchain//:simple_x86_64_linux_toolchain"
+   )
+   ```
+3. Targets are defined using the rules given in the target definition section
+   below.
+4. The build flag `--incompatible_enable_cc_toolchain_resolution` is used when
+   building targets. For example, a `.bazelrc` file may be used to provide this
+   flag.
 
 ## Conceptual target types and target definition
 The toolchain allows the definition of five kinds of conceptual targets.
@@ -326,3 +335,63 @@ command lines which were used for each trial target.
 
 Several test executables are defined to allow the validation of shared 
 library loading. An execution of `bazel test ...` should pass.
+
+## Additional information on C++ toolchain definition
+This section provides a brief explanation of what must be done to create a
+C++ toolchain which uses platforms. The main goal of this process is
+instantiating a `toolchain` target and registering it in the workspace. This
+section may be useful if modifications to this toolchain are desired.
+
+Instantiating `toolchain` for C++ toolchains requires several steps.
+A rule must be defined which provides a `CcToolchainConfigInfo` provider
+instance. This is done by having the implementation function of the rule return
+the result of invoking `cc_common.create_cc_toolchain_config_info` with
+object arguments with provide the logic of the toolchain. Defining these
+objects is the major activity of defining a toolchain. For example, compilation
+and linking command lines are generated by Bazel with the information provided
+to `create_cc_toolchain_config_info` in these objects. This toolchain
+definition uses `action_config` instead of `tool_path` as `tool_path` is
+deprecated. 
+
+The rule is then instantiated in a `BUILD` file. The target created by
+instantiating the rule is used in the instantiation of a `cc_toolchain` target.
+Finally, the `cc_toolchain` target is used in the instantiation of a
+`toolchain` target. To use this non-standard toolchain, the `toolchain` target
+must include `//nonstandard_toolchain:simple_cpp_toolchain` in the list
+argument of its `exec_compatible_with` attribute.
+
+The following list gives a step-by-step summary of this process for this
+toolchain after the custom rule definition step.
+
+Steps:
+1. In a `BUILD` file, the rule `cc_toolchain_config_info_generator` is loaded
+   from `//:toolchain_definition.bzl`. This rule provides an appropriate
+   provider instance for the `toolchain_config` attribute of `cc_toolchain`.
+2. The rule is instantiated to define a toolchain configuration target. The
+   name of this target conventionally ends with `_config`.
+3. A `cc_toolchain` target is instantiated with the appropriate attribute
+   values. The value of the `toolchain_config` attribute is set to the
+   config target which was instantiated in the previous step.
+4. A `toolchain` target is instantiated with:
+   * The appropriate `exec_compatible_with` and `target_compatible_with`
+     constraint values.
+     * For this non-standard toolchain, `exec_compatible_with` must include
+       `//nonstandard_toolchain:simple_cpp_toolchain`.
+   * As the value of the `toolchain` attribute, the `cc_toolchain` target which
+     was instantiated in the previous step.
+   * The `toolchain_type` attribute value `@rules_cc//cc:toolchain_type`.
+
+   The name of the `toolchain` target conventionally end with `_toolchain`.
+   This target provides the information which is needed by the general
+   toolchain mechanism of Bazel to perform platform-based toolchain resolution
+   on this toolchain.
+5. The execution platforms are registered as described aboved in "Simple
+   description of use".
+6. The `toolchain` target which was instantiated in the previous step is
+   registered in the `WORKSPACE` file with `register_toolchains`.
+7. Build and test actions use the
+   `--incompatible_enable_cc_toolchain_resolution` flag. This flag can be
+   provided on the command line or through the use of a `.bazelrc` file.
+
+The `BUILD` and `WORKSPACE` files of this repository serve as examples for this
+process.
