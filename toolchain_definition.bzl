@@ -356,8 +356,8 @@ determinism_options_feature = feature(
     enabled   = True,
     flag_sets = [
         flag_set(
-            # Note that static linking uses the d option (deterministic archive
-            # creation) by default.
+            # Note that static linking uses the D option (deterministic archive
+            # creation) for ar by default.
             actions       = [ACTION_NAMES.cpp_compile],
             with_features = [],
             flag_groups   = [

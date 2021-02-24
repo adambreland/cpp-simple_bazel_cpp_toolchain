@@ -4,8 +4,8 @@
 This Bazel workspace defines `//:simple_x86_64_linux_toolchain`. This
 toolchain can be used with the standard C++ rules. As the default C++ toolchain
 produces libraries and executables which do not conform to typical linking
-practices (see, for example, this [issue](https://github.com/bazelbuild/bazel/issues/492)
-), `//:simple_x86_64_linux_toolchain` was developed to have the
+practices (see, for example, this [issue](https://github.com/bazelbuild/bazel/issues/492)),
+`//:simple_x86_64_linux_toolchain` was developed to have the
 following features:
 * Position-independent code (PIC) is only used for shared libraries and
   PIC archives by default.
@@ -23,9 +23,9 @@ following features:
 * Targets which are defined to use the toolchain can depend on targets which
   should not be built with the toolchain.
 
-## Use cases and limitations
+## Toolchain system assumptions and limitations
 ### Instruction set, operating system, and compiler.
-* The toolchain is configured for Linux and x86-64. It uses `g++`.
+* The toolchain is configured for x86-64 and Linux. It uses `g++`.
 * The current include directories assume `g++` version 9. They can be found
   in `//:toolchain_definition.bzl` in list `gcc_system_include_directories`.
 
@@ -44,11 +44,12 @@ the toolchain.
 ### Notable Bazel features which are not supported
 * The toolchain does not vary compilation and linking options for the standard
   Bazel compilation modes: `dbg`, `fastbuild`, and `opt`. If such behavior is
-  desired, it can be implemented by specifying the desired compilation mode and
-  using instances of the `--copt` and `--linkopt` command line build options.
+  desired, it can be implemented without modifying the toolchain by specifying
+  the desired compilation mode and using instances of the `--copt` and
+  `--linkopt` command line build options.
 
 ## Using the toolchain
-The toolchain is intended to be used with [platforms](https://docs.bazel.build/versions/master/platforms-intro.html).
+The toolchain is configured to be used with [platforms](https://docs.bazel.build/versions/master/platforms-intro.html).
 Toolchain resolution which uses platforms only occurs for C++ rules when the
 following `build` flag is enabled:
 
@@ -60,9 +61,9 @@ necessary.
 ### Simple description of use
 Using the toolchain without modification requires a few steps:
 
-1. This repository is made an external repository of the local repository.
-   For example, `local_repository` may be used if this repository was cloned
-   locally.
+1. This repository is registered as an external repository of the local
+   repository. For example, `local_repository` may be used if this repository
+   was cloned locally.
 2. The execution platforms and toolchain are registered in the local
    `WORKSPACE` file as follows (assuming that the external repository is
    accessed with `@simple_bazel_cpp_toolchain`):
@@ -76,11 +77,14 @@ Using the toolchain without modification requires a few steps:
        "@simple_bazel_cpp_toolchain//:simple_x86_64_linux_toolchain"
    )
    ```
+   The use of `@local_config_platform//:host` assumes that remote execution is
+   not performed and that the host is an x86-64 Linux system. Also, as
+   described above, use of the toolchain requires `g++` and the presence of
+   the assumed system include directories.
 3. Targets are defined using the rules given in the target definition section
    below.
-4. The build flag `--incompatible_enable_cc_toolchain_resolution` is used when
-   building targets. For example, a `.bazelrc` file may be used to provide this
-   flag.
+4. The build flag `--incompatible_enable_cc_toolchain_resolution` is used. For
+   example, a `.bazelrc` file may be used to provide this flag.
 
 ## Conceptual target types and target definition
 The toolchain allows the definition of five kinds of conceptual targets.
@@ -96,6 +100,12 @@ which are necessary to define targets of these types follow. Also given are
 explanations of:
 * how to depend on shared libraries which are produced by the toolchain
 * how to depend on internal and external targets in `cc_test` targets
+
+### Definition practices for all targets
+* Any target which uses the toolchain and which requires compilation or linking
+  must be instantiated with the constraint value
+  `//nonstandard_toolchain:simple_cpp_toolchain` in its `exec_compatible_with`
+  attribute argument list.
 
 ### Shared library targets
 A shared library target is meant to represent a shared library which is linked
@@ -123,15 +133,16 @@ cc_library(
     name = "foo_header",
     deps = [],
     srcs = [],
-    hdrs = ["//:foo.h"]
+    hdrs = ["foo.h"]
 )
 
 cc_binary(
-    name     = "libfoo.so.1.0.0",
-    deps     = ["//:foo_header"],
-    srcs     = ["//:foo.cc"],
-    linkopts = ["-Wl,-soname=libfoo.so.1"],
-    features = ["interpret_as_shared_library"]
+    name                 = "libfoo.so.1.0.0",
+    deps                 = [":foo_header"],
+    srcs                 = ["foo.cc"],
+    linkopts             = ["-Wl,-soname=libfoo.so.1"],
+    features             = ["interpret_as_shared_library"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
@@ -147,32 +158,34 @@ shared library in their `data` attribute.
 Examples:
 ```
 cc_binary(
-    name     = "bar_on_foo",
-    deps     = ["//:foo_header"],
-    srcs     = [
-        "//:bar.cc",
-        "//:libfoo.so.1.0.0"
+    name                 = "bar_on_foo",
+    deps                 = [":foo_header"],
+    srcs                 = [
+        "bar.cc",
+        ":libfoo.so.1.0.0"
     ],
-    features = ["interpret_as_executable"]
+    features             = ["interpret_as_executable"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 
 genrule(
     name     = "libfoo.so.1.0.0_soname_symlink",
-    srcs     = ["//:libfoo.so.1.0.0"],
+    srcs     = [":libfoo.so.1.0.0"],
     outs     = ["libfoo.so.1"],
     # Make variable substitution is used to access the appropriate file paths.
-    cmd_bash = "ln -s $(rootpath //:libfoo.so.1.0.0) $@"
+    cmd_bash = "ln -s libfoo.so.1.0.0 $@"
 )
 
 cc_test(
-    name     = "test_on_foo",
-    deps     = ["//:foo_header"],
-    srcs     = [
-        "//:test_on_foo.cc",
-        "//:libfoo.so.1.0.0"
+    name                 = "test_on_foo",
+    deps                 = [":foo_header"],
+    srcs                 = [
+        "test_on_foo.cc",
+        ":libfoo.so.1.0.0"
     ],
-    data     = ["//:libfoo.so.1.0.0_soname_symlink"],
-    features = ["interpret_as_test_executable"]
+    data                 = [":libfoo.so.1.0.0_soname_symlink"],
+    features             = ["interpret_as_test_executable"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
@@ -188,10 +201,11 @@ Configuration:
 Example:
 ```
 cc_binary(
-    name       = "executable_target",
-    deps       = [],
-    srcs       = ["//:executable_target.cc"],
-    features   = ["interpret_as_executable"]
+    name                 = "executable_target",
+    deps                 = [],
+    srcs                 = ["executable_target.cc"],
+    features             = ["interpret_as_executable"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
@@ -209,13 +223,14 @@ Configuration:
 Example without indirect shared library dependencies:
 ```
 cc_test(
-    name     = "test_on_so",
-    deps     = ["//:so_header"],
-    srcs     = [
-        "//:test_on_so.cc",
-        "//:libso.so"
+    name                 = "test_on_so",
+    deps                 = [":so_header"],
+    srcs                 = [
+        "test_on_so.cc",
+        ":libso.so"
     ],
-    features = ["interpret_as_test_executable"]
+    features             = ["interpret_as_test_executable"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
@@ -251,43 +266,45 @@ cc_library(
     name = "spam_header",
     deps = [],
     srcs = [],
-    hdrs = ["//:spam.h"]
+    hdrs = ["spam.h"]
 )
 
 cc_binary(
-    name     = "libspam.so",
-    deps     = [
-        "//:spam_header",
-        "//:cram_header",
+    name                 = "libspam.so",
+    deps                 = [
+        ":spam_header",
+        ":cram_header",
         "//package1:ham_header",
         "@external_eggs//:eggs_header"
     ],
-    srcs     = [
-        "//:spam.cc",
-        "//:libcram.so",
+    srcs                 = [
+        "spam.cc",
+        ":libcram.so",
         "//package1:libham.so",
         "@external_eggs//:libeggs.so"
     ],
-    features = ["interpret_as_shared_library"]
+    features             = ["interpret_as_shared_library"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 
 cc_test(
-    name     = "test_with_indirect_so_deps",
-    deps     = ["//:spam_header"],
-    srcs     = [
-        "//:test_with_indirect_so_deps.cc",
-        "//:libspam.so"
+    name                 = "test_with_indirect_so_deps",
+    deps                 = [":spam_header"],
+    srcs                 = [
+        "test_with_indirect_so_deps.cc",
+        ":libspam.so"
     ],
     # Use $$ to escape $ and prevent Make variable substitution.
-    env      = {
+    env                  = {
         "LD_LIBRARY_PATH":
-          "$${ORIGIN}:$${ORIGIN}/package1:$${ORIGIN}/external/external_eggs"
+            "$${ORIGIN}:$${ORIGIN}/package1:$${ORIGIN}/external/external_eggs"
     },
-    features = ["interpret_as_test_executable"]
+    features             = ["interpret_as_test_executable"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
-### Archive targets
+### Archive targets (PIC archive and archive)
 Archive targets are intended to represent archives whose sources are not
 also directly compiled to shared object files or executables. This assumption
 separates library targets into two classes: those which define shared libraries
@@ -302,42 +319,43 @@ PIC archives and archives are defined in the usual way with two additions:
 Examples:
 ```
 cc_library(
-    name       = "pic_archive",
-    deps       = [],
-    srcs       = ["//:pic_archive.cc"],
-    hdrs       = ["//:pic_archive.h"],
-    linkstatic = True,
-    features   = ["interpret_as_pic_archive"]
+    name                 = "pic_archive",
+    deps                 = [],
+    srcs                 = ["pic_archive.cc"],
+    hdrs                 = ["pic_archive.h"],
+    linkstatic           = True,
+    features             = ["interpret_as_pic_archive"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 
 cc_library(
-    name       = "archive",
-    deps       = [],
-    srcs       = ["//:archive.cc"],
-    hdrs       = ["//:archive.h"],
-    linkstatic = True,
-    features   = ["interpret_as_archive"]
+    name                 = "archive",
+    deps                 = [],
+    srcs                 = ["archive.cc"],
+    hdrs                 = ["archive.h"],
+    linkstatic           = True,
+    features             = ["interpret_as_archive"],
+    exec_compatible_with = ["//nonstandard_toolchain:simple_cpp_toolchain"]
 )
 ```
 
 ## Building and testing the trial targets
-Trial targets are defined at the workspace root. These targets possess various
-dependency relationships on the three kinds of targets which can be depended
-upon (shared library, PIC archive, and archive). For example, in addition to an
-executable which depends on a shared library and a test which depends on a
-shared library, a test which depends on a shared library which depends on a 
-shared library is defined.
+Trial targets are defined which possess various dependency relationships on the
+three kinds of targets which can be depended upon (shared library, PIC archive,
+and archive). For example, in addition to an executable which depends on a
+shared library and a test which depends on a shared library, a test which
+depends on a shared library which depends on a shared library is defined.
 
 The command lines which are generated by the toolchain for these targets can
 be inspected by using the `-s` flag when executing `bazel build` or 
 `bazel test`. For example, `bazel build -s ...` should succeed and print the
 command lines which were used for each trial target. 
 
-Several test executables are defined to allow the validation of shared 
-library loading. An execution of `bazel test ...` should pass.
+Several test executables are defined to allow validation of shared library
+loading. An execution of `bazel test ...` should pass.
 
 ## Additional information on C++ toolchain definition
-This section provides a brief explanation of what must be done to create a
+This section provides a brief explanation of how to define a
 C++ toolchain which uses platforms. The main goal of this process is
 instantiating a `toolchain` target and registering it in the workspace. This
 section may be useful if modifications to this toolchain are desired.
@@ -385,10 +403,10 @@ Steps:
    This target provides the information which is needed by the general
    toolchain mechanism of Bazel to perform platform-based toolchain resolution
    on this toolchain.
-5. The execution platforms are registered as described aboved in "Simple
+5. The execution platforms are registered as described above in "Simple
    description of use".
-6. The `toolchain` target which was instantiated in the previous step is
-   registered in the `WORKSPACE` file with `register_toolchains`.
+6. The `toolchain` target is registered in the `WORKSPACE` file with
+   `register_toolchains`.
 7. Build and test actions use the
    `--incompatible_enable_cc_toolchain_resolution` flag. This flag can be
    provided on the command line or through the use of a `.bazelrc` file.
