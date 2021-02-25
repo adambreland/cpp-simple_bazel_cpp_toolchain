@@ -17,13 +17,13 @@ following features:
     linker option `-Wl,-soname=<library soname>`.
   * Executables and shared libraries are not linked against shared libraries
     which are part of the implementation details of Bazel.
-  * Mechanisms such as `DT_RPATH` are not used in executables and
+  * Mechanisms such as `DT_RUNPATH` are not used in executables and
     shared libraries by default.
 * A library must be exactly one of: shared library, PIC archive, or archive.
 * Targets which are defined to use the toolchain can depend on targets which
   should not be built with the toolchain.
 
-## Toolchain system assumptions and limitations
+## Toolchain system assumptions; toolchain limitations
 ### Instruction set, operating system, and compiler.
 * The toolchain is configured for x86-64 and Linux. It uses `g++`.
 * The current include directories assume `g++` version 9. They can be found
@@ -41,7 +41,7 @@ The `-s` flag for `bazel build` can be used to print build command lines. These
 can then be inspected to ensure that a particular target is built correctly by
 the toolchain.
 
-### Notable Bazel features which are not supported
+#### Notable Bazel features which are not supported
 * The toolchain does not vary compilation and linking options for the standard
   Bazel compilation modes: `dbg`, `fastbuild`, and `opt`. If such behavior is
   desired, it can be implemented without modifying the toolchain by specifying
@@ -172,7 +172,7 @@ genrule(
     name     = "libfoo.so.1.0.0_soname_symlink",
     srcs     = [":libfoo.so.1.0.0"],
     outs     = ["libfoo.so.1"],
-    # Make variable substitution is used to access the appropriate file paths.
+    # Make variable substitution is used to access the output path.
     cmd_bash = "ln -s libfoo.so.1.0.0 $@"
 )
 
