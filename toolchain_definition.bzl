@@ -180,6 +180,16 @@ libraries_to_link_feature = feature(
                     flag_group(
                     flags = [
                         "-Wl,--unresolved-symbols=ignore-in-shared-libs",
+                        # Note that
+                        # -Wl,--unresolved-symbols=ignore-in-shared-libs
+                        # includes the behavior of -Wl,-z,defs and adds
+                        # the additional behavior of ignoring undefined symbols
+                        # from shared libraries. This is necessary when an
+                        # object file depends on a shared library which depends
+                        # on a shared library. Otherwise, symbols from the
+                        # transitive dependency in the direct shared library
+                        # dependency would be flagged as undefined when the
+                        # object file is linked.
                         "-pass-exit-codes"
                     ],
                     flag_groups = [],
